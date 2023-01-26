@@ -1,0 +1,1764 @@
+##2.1. Explore pathogenesis pathways of PRCC 
+##2.1.1 Identify DEGs between normal and PRCC
+#mRNA的差异表达分析
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install("limma")
+#install.packages("pheatmap")
+#引用包
+library(limma)
+library(pheatmap)
+setwd("C:\\Users\\86156\\Desktop\\KIRP_ChuzhongWei\\01_diffFunc")  #设置工作目录
+fdrFilter=0.05        #fdr临界值
+logFCfilter=1         #logFC临界值
+conNum=32             #Normal样品数目
+treatNum=289          #Treat样品数目
+inputFile="mRNA.txt"    #输入文件
+#读取输入文件
+outTab=data.frame()
+grade=c(rep(1,conNum),rep(2,treatNum))
+rt=read.table(inputFile, header=T, sep="\t", check.names=F)
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp),colnames(exp))
+data=matrix(as.numeric(as.matrix(exp)),nrow=nrow(exp),dimnames=dimnames)
+data=avereps(data)
+data=data[rowMeans(data)>0.4,]
+#差异分析
+for(i in row.names(data)){
+	  lncName=unlist(strsplit(i,"\\|",))[1]
+	  lncName=gsub("\\/", "_", lncName)
+	  rt=rbind(expression=data[i,],grade=grade)
+	  rt=as.matrix(t(rt))
+	  wilcoxTest=wilcox.test(expression ~ grade, data=rt)
+	  conLncMeans=mean(data[i,1:conNum])
+	  treatLncMeans=mean(data[i,(conNum+1):ncol(data)])
+	  logFC=log2(treatLncMeans)-log2(conLncMeans)  
+	  pvalue=wilcoxTest$p.value
+	  conMed=median(data[i,1:conNum])
+	  treatMed=median(data[i,(conNum+1):ncol(data)])
+	  diffMed=treatMed-conMed
+	  if( ((logFC>0) & (diffMed>0)) | ((logFC<0) & (diffMed<0)) ){  
+			outTab=rbind(outTab,cbind(lnc=i,conMean=conLncMeans,treatMean=treatLncMeans,logFC=logFC,pValue=pvalue))
+	  }
+}
+pValue=outTab[,"pValue"]
+fdr=p.adjust(as.numeric(as.vector(pValue)), method="fdr")
+outTab=cbind(outTab,fdr=fdr)
+#输出所有mRNA的差异情况
+write.table(outTab,file="mRNAall.xls",sep="\t",row.names=F,quote=F)
+#输出差异表格
+outDiff=outTab[( abs(as.numeric(as.vector(outTab$logFC)))>logFCfilter & as.numeric(as.vector(outTab$fdr))<fdrFilter),]
+write.table(outDiff,file="mRNAdiff.xls",sep="\t",row.names=F,quote=F)
+write.table(outDiff,file="mRNAdiff.txt",sep="\t",row.names=F,quote=F)
+#输出差异mRNA的表达文件
+heatmap=rbind(ID=colnames(data[as.vector(outDiff[,1]),]),data[as.vector(outDiff[,1]),])
+write.table(heatmap,file="mRNADiffExp.txt",sep="\t",col.names=F,quote=F)
+#差异mRNA热图heatmap
+rt=read.table("mRNADiffExp.txt",sep="\t",header=T,row.names=1,check.names=F) 
+rt=log2(rt+0.001)
+library(pheatmap)
+Type=c(rep("con",32),rep("treat",289))    #修改对照和处理组样品数目
+names(Type)=colnames(rt)
+Type=as.data.frame(Type)
+pdf("mRNAheatmap.pdf",height=30,width=40)
+pheatmap(rt, 
+         annotation=Type, 
+         color = colorRampPalette(c("green", "black", "red"))(50),
+         cluster_cols =F,
+         fontsize = 10,
+         fontsize_row=2,
+         fontsize_col=3)
+dev.off()
+#差异mRNA火山图volcano
+pdf(file="mRNAvol.pdf",height=5,width=5)
+xMax=8
+yMax=max(-log10(outTab$fdr))+1
+plot(as.numeric(as.vector(outTab$logFC)), -log10(outTab$fdr), xlab="logFC",ylab="-log10(fdr)",
+     main="Volcano", ylim=c(0,yMax),xlim=c(-xMax,xMax),yaxs="i",pch=20, cex=0.8)
+diffSub=subset(outTab, fdr<fdrFilter & as.numeric(as.vector(logFC))>logFCfilter)
+points(as.numeric(as.vector(diffSub$logFC)), -log10(diffSub$fdr), pch=20, col="red",cex=1)
+diffSub=subset(outTab, fdr<fdrFilter & as.numeric(as.vector(logFC))<(-logFCfilter))
+points(as.numeric(as.vector(diffSub$logFC)), -log10(diffSub$fdr), pch=20, col="green",cex=1)
+abline(v=0,lty=2,lwd=3)
+dev.off()
+
+##lncRNA的差异表达分析
+#引用包
+library(limma)
+library(pheatmap)
+fdrFilter=0.05        #fdr临界值
+logFCfilter=1         #logFC临界值
+conNum=32             #Normal样品数目
+treatNum=289          #Treat样品数目
+inputFile="lncRNA.txt"    #输入文件
+#读取输入文件
+outTab=data.frame()
+grade=c(rep(1,conNum),rep(2,treatNum))
+rt=read.table(inputFile, header=T, sep="\t", check.names=F)
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp),colnames(exp))
+data=matrix(as.numeric(as.matrix(exp)),nrow=nrow(exp),dimnames=dimnames)
+data=avereps(data)
+data=data[rowMeans(data)>0.4,]
+#差异分析
+for(i in row.names(data)){
+	  lncName=unlist(strsplit(i,"\\|",))[1]
+	  lncName=gsub("\\/", "_", lncName)
+	  rt=rbind(expression=data[i,],grade=grade)
+	  rt=as.matrix(t(rt))
+	  wilcoxTest=wilcox.test(expression ~ grade, data=rt)
+	  conLncMeans=mean(data[i,1:conNum])
+	  treatLncMeans=mean(data[i,(conNum+1):ncol(data)])
+	  logFC=log2(treatLncMeans)-log2(conLncMeans)  
+	  pvalue=wilcoxTest$p.value
+	  conMed=median(data[i,1:conNum])
+	  treatMed=median(data[i,(conNum+1):ncol(data)])
+	  diffMed=treatMed-conMed
+	  if( ((logFC>0) & (diffMed>0)) | ((logFC<0) & (diffMed<0)) ){  
+			outTab=rbind(outTab,cbind(lnc=i,conMean=conLncMeans,treatMean=treatLncMeans,logFC=logFC,pValue=pvalue))
+	  }
+}
+pValue=outTab[,"pValue"]
+fdr=p.adjust(as.numeric(as.vector(pValue)), method="fdr")
+outTab=cbind(outTab,fdr=fdr)
+#输出所有lncRNA的差异情况
+write.table(outTab,file="lncRNAall.xls",sep="\t",row.names=F,quote=F)
+#输出差异表格
+outDiff=outTab[( abs(as.numeric(as.vector(outTab$logFC)))>logFCfilter & as.numeric(as.vector(outTab$fdr))<fdrFilter),]
+write.table(outDiff,file="lncRNAdiff.xls",sep="\t",row.names=F,quote=F)
+write.table(outDiff,file="lncRNAdiff.txt",sep="\t",row.names=F,quote=F)
+#输出差异lncRNA的表达文件
+heatmap=rbind(ID=colnames(data[as.vector(outDiff[,1]),]),data[as.vector(outDiff[,1]),])
+write.table(heatmap,file="lncRNADiffExp.txt",sep="\t",col.names=F,quote=F)
+#差异lncRNA热图heatmap
+rt=read.table("lncRNADiffExp.txt",sep="\t",header=T,row.names=1,check.names=F) 
+rt=log2(rt+0.001)
+library(pheatmap)
+Type=c(rep("con",32),rep("treat  ",289))    #修改对照和处理组样品数目
+names(Type)=colnames(rt)
+Type=as.data.frame(Type)
+pdf("lncRNAheatmap.pdf",height=30,width=40)
+pheatmap(rt, 
+         annotation=Type, 
+         color = colorRampPalette(c("green", "black", "red"))(50),
+         cluster_cols =F,
+         fontsize = 10,
+         fontsize_row=2,
+         fontsize_col=3)
+dev.off()
+#差异lncRNA火山图volcano
+pdf(file="lncRNAvol.pdf",height=5,width=5)
+xMax=8
+yMax=max(-log10(outTab$fdr))+1
+plot(as.numeric(as.vector(outTab$logFC)), -log10(outTab$fdr), xlab="logFC",ylab="-log10(fdr)",
+     main="Volcano", ylim=c(0,yMax),xlim=c(-xMax,xMax),yaxs="i",pch=20, cex=0.8)
+diffSub=subset(outTab, fdr<fdrFilter & as.numeric(as.vector(logFC))>logFCfilter)
+points(as.numeric(as.vector(diffSub$logFC)), -log10(diffSub$fdr), pch=20, col="red",cex=1)
+diffSub=subset(outTab, fdr<fdrFilter & as.numeric(as.vector(logFC))<(-logFCfilter))
+points(as.numeric(as.vector(diffSub$logFC)), -log10(diffSub$fdr), pch=20, col="green",cex=1)
+abline(v=0,lty=2,lwd=3)
+dev.off()
+
+
+##2.1.2 Functional enrichment analysis based on GO and KEGG
+#用差异mRNA和差异lncRNA构建共表达网络分析
+library(limma)            #引用包
+lncFile="lncRNADiffExp.txt"      #lncRNA差异表达文件
+mrnaFile="mRNADiffExp.txt"       #mRNA差异表达文件
+diffFile="lncRNAdiff.txt"       #差异lncRNA文件   
+#读取lncRNA表达文件,并对数据进行处理
+rt=read.table(lncFile, header=T, sep="\t", check.names=F)
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp),colnames(exp))
+lncRNA=matrix(as.numeric(as.matrix(exp)),nrow=nrow(exp),dimnames=dimnames)
+lncRNA=avereps(lncRNA)
+lncRNA=lncRNA[rowMeans(lncRNA)>0,]
+#删除正常样品
+group=sapply(strsplit(colnames(lncRNA),"\\-"),"[",4)
+group=sapply(strsplit(group,""),"[",1)
+group=gsub("2","1",group)
+lncRNA=lncRNA[,group==0]
+#提取差异lncRNA
+diff=read.table(diffFile, header=T, sep="\t", check.names=F)
+lncRNA=lncRNA[as.vector(diff[,1]),]
+#读取mRNA输入文件,并对数据进行处理
+rt=read.table(mrnaFile, header=T, sep="\t", check.names=F)
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp),colnames(exp))
+mRNA=matrix(as.numeric(as.matrix(exp)), nrow=nrow(exp), dimnames=dimnames)
+mRNA=avereps(mRNA)
+mRNA=mRNA[rowMeans(mRNA)>0.5,]
+#删除正常样品
+group=sapply(strsplit(colnames(mRNA),"\\-"),"[",4)
+group=sapply(strsplit(group,""),"[",1)
+group=gsub("2","1",group)
+mRNA=mRNA[,group==0]
+#相关性检验
+outTab=data.frame()
+for(i in row.names(lncRNA)){
+	lncTab=data.frame()
+	for(j in row.names(mRNA)){
+		if(sd(mRNA[j,])>0.5){
+			x=as.numeric(lncRNA[i,])
+		    y=as.numeric(mRNA[j,])
+			corT=cor.test(x,y)
+			cor=corT$estimate
+			pvalue=corT$p.value
+			lncTab=rbind(lncTab, cbind(lncRNA=i, mRNA=j, cor, pvalue))
+		}
+    }
+    lncTab=lncTab[order(abs(as.numeric(as.vector(lncTab[,"cor"]))),decreasing = T),]
+    if(nrow(lncTab)>10){
+    	lncTab=lncTab[1:10,]
+    }
+    if(nrow(lncTab)>0){
+    	outTab=rbind(outTab, lncTab)
+    }
+}
+#输出相关性网络
+write.table(file="net.network.txt",outTab,sep="\t",quote=F,row.names=F)
+#输出相关性节点属性
+lncNode=data.frame(Node=unique(as.vector(outTab[,"lncRNA"])), Type="lncRNA")
+mrnaNode=data.frame(Node=unique(as.vector(outTab[,"mRNA"])), Type="mRNA")
+nodeOut=rbind(lncNode, mrnaNode)
+write.table(nodeOut, file="net.node.txt", sep="\t", quote=F, row.names=F)
+#install.packages("igraph")
+library(igraph)               #引用包
+nodefile="net.node.txt"       #节点输入文件
+edgefile="net.network.txt"    #网络输入文件
+outfile="network.pdf"         #输出结果文件
+lncRNAcol="#00AFBB"           #lncRNA颜色
+mRNAcol="#FC4E07"             #mRNA颜色
+#提取数据
+options(stringsAsFactors=F)
+node.data=read.table(nodefile, header=T, sep="\t", check.names=F)
+edge.data=read.table(edgefile, header=T, sep="\t", check.names=F)
+color=ifelse(node.data$Type=="lncRNA", lncRNAcol, mRNAcol)
+value=ifelse(node.data$Type=="lncRNA", 7, 4)
+node=data.frame(id=node.data$Node,label=node.data$Node,color=color,shape="dot",value=value)
+edge=data.frame(from=edge.data$lncRNA,to=edge.data$mRNA,length=100,arrows="middle",smooth=TRUE,shadow=FALSE,weight=edge.data$cor)
+#节点和边的属性
+d=data.frame(p1=edge$from,p2=edge$to,weight=abs(edge$weight))
+g=graph.data.frame(d,directed = FALSE)
+E(g)$color="grey30"
+V(g)$size=node$value[match(names(components(g)$membership),node$label)]
+V(g)$shape="sphere"
+V(g)$lable.cex=0
+V(g)$color=node$color[match(names(components(g)$membership),node$label)]
+#网络可视化
+pdf(outfile,width=10,height=9)
+layout(mat=matrix(c(1,2,1,2),nc=2), height=c(1,7))
+par(mar=c(0,5,3,5))
+plot(1,type="n",axes=F,xlab="",ylab="")
+legend('center',legend=c('lncRNA','mRNA'),col=c(lncRNAcol,mRNAcol),pch=16,bty="n",ncol=2,cex=3)
+vertex.frame.color = node$color
+edge_col=E(g)$color
+plot(g,layout=layout_with_graphopt,vertex.size=V(g)$size,vertex.label=NA,vertex.label.cex=V(g)$lable.cex,edge.width = 0.1,edge.arrow.size=0,vertex.label.color=NULL,vertex.frame.color=NA,edge.color=edge_col,vertex.label.font=2)
+dev.off()
+
+#GO功能富集分析
+#install.packages("colorspace")
+#install.packages("stringi")
+#install.packages("ggplot2")
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+    #install.packages("BiocManager")
+#上面2行一起复制运行。然后，再下面代码一行行单独运行安装
+#BiocManager::install("org.Hs.eg.db")
+#BiocManager::install("DOSE")
+#BiocManager::install("clusterProfiler")
+#BiocManager::install("enrichplot")
+#引用包
+library("clusterProfiler")
+library("org.Hs.eg.db")
+library("enrichplot")
+library("ggplot2")
+pvalueFilter=0.05       #p值过滤条件
+qvalueFilter=0.05       #矫正后的p值过滤条件
+#定义颜色
+colorSel="qvalue"
+if(qvalueFilter>0.05){
+	colorSel="pvalue"
+}
+rt=read.table("net.network.txt", header=T, sep="\t", check.names=F)     #读取输入文件
+#基因名字转换为基因id
+genes=unique(as.vector(rt[,2]))
+entrezIDs=mget(genes, org.Hs.egSYMBOL2EG, ifnotfound=NA)
+entrezIDs=as.character(entrezIDs)
+gene=entrezIDs[entrezIDs!="NA"]        #去除基因id为NA的基因
+#GO富集分析
+kk=enrichGO(gene=gene, OrgDb=org.Hs.eg.db, pvalueCutoff=1, qvalueCutoff=1, ont="all", readable=T)
+GO=as.data.frame(kk)
+GO=GO[(GO$pvalue<pvalueFilter & GO$qvalue<qvalueFilter),]
+#保存富集结果
+write.table(GO, file="GO.txt", sep="\t", quote=F, row.names = F)
+#定义显示Term数目
+showNum=10
+if(nrow(GO)<30){
+	showNum=nrow(GO)
+}
+#柱状图
+pdf(file="barplot_GO.pdf", width=9, height=7)
+bar=barplot(kk, drop=TRUE, showCategory=showNum, split="ONTOLOGY", color=colorSel) + facet_grid(ONTOLOGY~., scale='free')
+print(bar)
+dev.off()
+#气泡图
+pdf(file="bubble_GO.pdf", width=9, height=7)
+bub=dotplot(kk, showCategory=showNum, orderBy="GeneRatio", split="ONTOLOGY", color=colorSel) + facet_grid(ONTOLOGY~., scale='free')
+print(bub)
+dev.off()
+
+#KEGG功能富集分析
+#引用包
+library("clusterProfiler")
+library("org.Hs.eg.db")
+library("enrichplot")
+library("ggplot2")
+pvalueFilter=0.05           #p值过滤条件
+qvalueFilter=0.05           #矫正后的p值过滤条件
+#定义颜色
+colorSel="qvalue"
+if(qvalueFilter>0.05){
+	colorSel="pvalue"
+}
+rt=read.table("net.network.txt", header=T, sep="\t", check.names=F)     #读取输入文件
+#基因名字转换为基因id
+genes=unique(as.vector(rt[,2]))
+entrezIDs=mget(genes, org.Hs.egSYMBOL2EG, ifnotfound=NA)
+entrezIDs=as.character(entrezIDs)
+rt=data.frame(genes, entrezID=entrezIDs)
+gene=entrezIDs[entrezIDs!="NA"]        #去除基因id为NA的基因
+#kegg富集分析
+kk <- enrichKEGG(gene=gene, organism="hsa", pvalueCutoff=1, qvalueCutoff=1)
+KEGG=as.data.frame(kk)
+KEGG$geneID=as.character(sapply(KEGG$geneID,function(x)paste(rt$genes[match(strsplit(x,"/")[[1]],as.character(rt$entrezID))],collapse="/")))
+KEGG=KEGG[(KEGG$pvalue<pvalueFilter & KEGG$qvalue<qvalueFilter),]
+#保存富集结果
+write.table(KEGG, file="KEGG.txt", sep="\t", quote=F, row.names = F)
+#定义显示Term数目
+showNum=30
+if(nrow(KEGG)<showNum){
+	showNum=nrow(KEGG)
+}
+#柱状图
+pdf(file="barplot_KEGG.pdf", width=9, height=7)
+barplot(kk, drop=TRUE, showCategory=showNum, color=colorSel)
+dev.off()
+#气泡图
+pdf(file="bubble_KEGG.pdf", width = 9, height = 7)
+dotplot(kk, showCategory=showNum, orderBy="GeneRatio", color=colorSel)
+dev.off()
+
+##2.2 Construct genomic instability-derived lncRNA prognostic index (GILPI) computational framework
+##2.2.1 Identify genomic instability-derived lncRNA set (GILncSet)
+##根据GS和GU分类的差异表达LncRNA
+#引用包
+library(limma)
+library(pheatmap)
+fdrFilter=0.05        #fdr临界值
+logFCfilter=1         #logFC临界值
+conNum=72             #低突变组(GS)样品数目，提供
+treatNum=76           #高突变组(GU)样品数目，提供
+inputFile="lncRNA.mutGroup.txt"      #输入文件，提供
+#读取输入文件
+outTab=data.frame()
+grade=c(rep(1,conNum),rep(2,treatNum))
+rt=read.table(inputFile, header=T, sep="\t", check.names=F)
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp),colnames(exp))
+data=matrix(as.numeric(as.matrix(exp)),nrow=nrow(exp),dimnames=dimnames)
+data=avereps(data)
+data=data[rowMeans(data)>0.4,]
+#差异分析
+for(i in row.names(data)){
+	  lncName=unlist(strsplit(i,"\\|",))[1]
+	  lncName=gsub("\\/", "_", lncName)
+	  rt=rbind(expression=data[i,],grade=grade)
+	  rt=as.matrix(t(rt))
+	  wilcoxTest=wilcox.test(expression ~ grade, data=rt)
+	  conLncMeans=mean(data[i,1:conNum])
+	  treatLncMeans=mean(data[i,(conNum+1):ncol(data)])
+	  logFC=log2(treatLncMeans)-log2(conLncMeans)  
+	  pvalue=wilcoxTest$p.value
+	  conMed=median(data[i,1:conNum])
+	  treatMed=median(data[i,(conNum+1):ncol(data)])
+	  diffMed=treatMed-conMed
+	  if( ((logFC>0) & (diffMed>0)) | ((logFC<0) & (diffMed<0)) ){  
+			outTab=rbind(outTab,cbind(lnc=i,conMean=conLncMeans,treatMean=treatLncMeans,logFC=logFC,pValue=pvalue))
+	  }
+}
+pValue=outTab[,"pValue"]
+fdr=p.adjust(as.numeric(as.vector(pValue)), method="fdr")
+outTab=cbind(outTab,fdr=fdr)
+#输出所有lncRNA的差异情况
+write.table(outTab,file="all.xls",sep="\t",row.names=F,quote=F)
+#输出差异表格
+outDiff=outTab[( abs(as.numeric(as.vector(outTab$logFC)))>logFCfilter & as.numeric(as.vector(outTab$fdr))<fdrFilter),]
+write.table(outDiff,file="diff.xls",sep="\t",row.names=F,quote=F)
+write.table(outDiff,file="diff.txt",sep="\t",row.names=F,quote=F)
+#输出差异lncRNA的表达文件
+heatmap=rbind(ID=colnames(data[as.vector(outDiff[,1]),]),data[as.vector(outDiff[,1]),])
+write.table(heatmap,file="diffLncExp.txt",sep="\t",col.names=F,quote=F)
+#绘制差异lncRNA热图
+lncNum=20
+diffSig=outDiff[order(as.numeric(as.vector(outDiff$logFC))),]
+diffLncName=as.vector(diffSig[,1])
+diffLength=length(diffLncName)
+hmLnc=c()
+if(diffLength>(lncNum*2) ){
+    hmLnc=diffLncName[c(1:lncNum,(diffLength-lncNum+1):diffLength)]
+}else{
+    hmLnc=diffLncName
+}
+hmExp=data[hmLnc,]
+hmExp=log2(hmExp+0.01)
+Type=c(rep("GS",conNum),rep("GU",treatNum))
+names(Type)=colnames(data)
+Type=as.data.frame(Type)
+pdf(file="heatmap-lncDiff.pdf",height=5,width=7)
+pheatmap(hmExp, 
+         annotation=Type, 
+         color = colorRampPalette(c("blue", "white", "red"))(50),
+         cluster_cols =F,
+         show_colnames = F,
+         scale="row",
+         fontsize = 8,
+         fontsize_row=6,
+         fontsize_col=8)
+dev.off()
+
+
+##2.2.3 Construct GILPI computational framework in the training group
+##2.2.4 Verify the reliability of the GILPI computational framework in the testing group and the TCGA group
+##预后模型构建
+#IncRNA表达文件与time文件合并
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install("limma")
+library(limma)             #引用包
+expFile="lncRNA.txt"       #lncRNA表达数据文件,从01复制过来
+cliFile="time.txt"         #TCGA的time文件，已经提供
+geneFile="diff.txt"        #差异表达的lncRNA文件,从01复制过来
+#读取表达文件，并对输入文件整理
+rt=read.table(expFile, header=T, sep="\t", check.names=F)
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp), colnames(exp))
+data=matrix(as.numeric(as.matrix(exp)), nrow=nrow(exp), dimnames=dimnames)
+data=avereps(data)
+data=data[rowMeans(data)>0,]
+#读取lncRNA列表
+gene=read.table(geneFile, header=T, sep="\t", check.names=F)
+sameGene=intersect(as.vector(gene[,1]), row.names(data))
+data=data[sameGene,]
+#删掉正常样品
+group=sapply(strsplit(colnames(data),"\\-"),"[",4)
+group=sapply(strsplit(group,""),"[",1)
+group=gsub("2", "1", group)
+data=data[,group==0]
+colnames(data)=gsub("(.*?)\\-(.*?)\\-(.*?)\\-.*", "\\1\\-\\2\\-\\3", colnames(data))
+data=t(data)
+data=avereps(data)
+#读取生存数据
+cli=read.table(cliFile,header=T,sep="\t",check.names=F,row.names=1)
+#数据合并并输出结果
+sameSample=intersect(row.names(data),row.names(cli))
+data=data[sameSample,]
+cli=cli[sameSample,]
+out=cbind(cli,data)
+out=cbind(id=row.names(out),out)
+write.table(out,file="expTime.txt",sep="\t",row.names=F,quote=F)
+#预后模型构建
+#install.packages("survival")
+#install.packages("caret") #如果失败
+#install.packages("glmnet")
+#install.packages("survminer")
+#install.packages("timeROC")
+#引用包
+library(survival)
+library(caret)
+library(glmnet)
+library(survminer)
+library(timeROC)
+coxPfilter=0.05        #cox方法显著性过滤标准
+rt=read.table("expTime.txt",header=T,sep="\t",check.names=F,row.names=1)     #读取输入文件
+rt$futime=rt$futime/365
+#定义森林图函数
+bioForest=function(coxFile=null,forestFile=null,forestCol=null){
+	#读取输入文件
+	rt <- read.table(coxFile,header=T,sep="\t",row.names=1,check.names=F)
+	gene <- rownames(rt)
+	hr <- sprintf("%.3f",rt$"HR")
+	hrLow  <- sprintf("%.3f",rt$"HR.95L")
+	hrHigh <- sprintf("%.3f",rt$"HR.95H")
+	Hazard.ratio <- paste0(hr,"(",hrLow,"-",hrHigh,")")
+	pVal <- ifelse(rt$pvalue<0.001, "<0.001", sprintf("%.3f", rt$pvalue))
+	#输出图形
+	pdf(file=forestFile, width = 7, height = 4.5)
+	n <- nrow(rt)
+	nRow <- n+1
+	ylim <- c(1,nRow)
+	layout(matrix(c(1,2),nc=2),width=c(3,2.5))
+	#绘制森林图左边的临床信息
+	xlim = c(0,3)
+	par(mar=c(4,2.5,2,1))
+	plot(1,xlim=xlim,ylim=ylim,type="n",axes=F,xlab="",ylab="")
+	text.cex=0.8
+	text(0,n:1,gene,adj=0,cex=text.cex)
+	text(1.5-0.5*0.2,n:1,pVal,adj=1,cex=text.cex);text(1.5-0.5*0.2,n+1,'pvalue',cex=text.cex,adj=1)
+	text(3,n:1,Hazard.ratio,adj=1,cex=text.cex);text(3,n+1,'Hazard ratio',cex=text.cex,adj=1,)
+	#绘制森林图
+	par(mar=c(4,1,2,1),mgp=c(2,0.5,0))
+	xlim = c(0,max(as.numeric(hrLow),as.numeric(hrHigh)))
+	plot(1,xlim=xlim,ylim=ylim,type="n",axes=F,ylab="",xaxs="i",xlab="Hazard ratio")
+	arrows(as.numeric(hrLow),n:1,as.numeric(hrHigh),n:1,angle=90,code=3,length=0.05,col="darkblue",lwd=2.5)
+	abline(v=1,col="black",lty=2,lwd=2)
+	boxcolor = ifelse(as.numeric(hr) > 1, forestCol[1], forestCol[2])
+	points(as.numeric(hr), n:1, pch = 15, col = boxcolor, cex=1.3)
+	axis(1)
+	dev.off()
+}
+#绘制森林图函数
+#对分组进行循环，找出train和test都显著的分组
+for(i in 1:530){
+	#############对数据进行分组#############
+	inTrain<-createDataPartition(y=rt[,3], p=0.5, list=F)
+	train<-rt[inTrain,]
+	test<-rt[-inTrain,]
+	trainOut=cbind(id=row.names(train),train)
+	testOut=cbind(id=row.names(test),test)
+	#单因素cox分析
+	outUniTab=data.frame()
+	sigGenes=c("futime","fustat")
+	for(i in colnames(train[,3:ncol(train)])){
+		#if (TRUE & FALSE %in% sigGenes){} 当报错：there is only 1 group
+		#cox分析
+		cox <- coxph(Surv(futime, fustat) ~ train[,i], data = train)
+		coxSummary = summary(cox)
+		coxP=coxSummary$coefficients[,"Pr(>|z|)"]
+		#KM分析
+		#group=ifelse(train[,i]>median(train[,i]),"high","low")
+		#diff=survdiff(Surv(futime, fustat) ~group,data = train)
+		#pValue=1-pchisq(diff$chisq,df=1)
+		#保留显著性基因
+		if(coxP<coxPfilter){
+		    sigGenes=c(sigGenes,i)
+			outUniTab=rbind(outUniTab,
+				         cbind(id=i,
+				         HR=coxSummary$conf.int[,"exp(coef)"],
+				         HR.95L=coxSummary$conf.int[,"lower .95"],
+				         HR.95H=coxSummary$conf.int[,"upper .95"],
+				         pvalue=coxSummary$coefficients[,"Pr(>|z|)"])
+				         )
+		}
+	}
+	uniSigExp=train[,sigGenes]
+	uniSigExpOut=cbind(id=row.names(uniSigExp),uniSigExp)
+	#构建COX模型
+	multiCox <- coxph(Surv(futime, fustat) ~ ., data = uniSigExp)
+	multiCox=step(multiCox,direction = "both")
+	multiCoxSum=summary(multiCox)
+	#输出模型相关信息
+	outMultiTab=data.frame()
+	outMultiTab=cbind(
+		               coef=multiCoxSum$coefficients[,"coef"],
+		               HR=multiCoxSum$conf.int[,"exp(coef)"],
+		               HR.95L=multiCoxSum$conf.int[,"lower .95"],
+		               HR.95H=multiCoxSum$conf.int[,"upper .95"],
+		               pvalue=multiCoxSum$coefficients[,"Pr(>|z|)"])
+	outMultiTab=cbind(id=row.names(outMultiTab),outMultiTab)
+	#输出train组风险文件
+	riskScore=predict(multiCox,type="risk",newdata=train)          #利用train得到模型预测train样品风险
+	coxGene=rownames(multiCoxSum$coefficients)
+	coxGene=gsub("`","",coxGene)
+	outCol=c("futime","fustat",coxGene)
+	medianTrainRisk=median(riskScore)
+	risk=as.vector(ifelse(riskScore>medianTrainRisk,"high","low"))
+	trainRiskOut=cbind(id=rownames(cbind(train[,outCol],riskScore,risk)),cbind(train[,outCol],riskScore,risk))
+	#输出test组风险文件
+	riskScoreTest=predict(multiCox,type="risk",newdata=test)        #利用train得到模型预测test样品风险
+	riskTest=as.vector(ifelse(riskScoreTest>medianTrainRisk,"high","low"))
+	testRiskOut=cbind(id=rownames(cbind(test[,outCol],riskScoreTest,riskTest)),cbind(test[,outCol],riskScore=riskScoreTest,risk=riskTest))
+	#生存差异pvalue	
+	diff=survdiff(Surv(futime, fustat) ~risk,data = train)
+	pValue=1-pchisq(diff$chisq, df=1)
+	diffTest=survdiff(Surv(futime, fustat) ~riskTest,data = test)
+	pValueTest=1-pchisq(diffTest$chisq, df=1)
+	#ROC曲线下面积
+	predictTime=1    #预测时间
+	roc=timeROC(T=train$futime, delta=train$fustat,
+	            marker=riskScore, cause=1,
+	            weighting='aalen',
+	            times=c(predictTime), ROC=TRUE)
+	rocTest=timeROC(T=test$futime, delta=test$fustat,
+	            marker=riskScoreTest, cause=1,
+	            weighting='aalen',
+	            times=c(predictTime), ROC=TRUE)	
+	if((pValue<0.01) & (roc$AUC[2]>0.7) & (pValueTest<0.05) & (rocTest$AUC[2]>0.65)){
+		#输出分组结果
+		write.table(trainOut,file="train.data.txt",sep="\t",quote=F,row.names=F)
+		write.table(testOut,file="test.data.txt",sep="\t",quote=F,row.names=F)
+		#输出单因素结果
+		write.table(outUniTab,file="trainUniCox.txt",sep="\t",row.names=F,quote=F)
+		write.table(uniSigExpOut,file="tcgaUniSigExp.txt",sep="\t",row.names=F,quote=F)
+		bioForest(coxFile="trainUniCox.txt",forestFile="trainUniCox.pdf",forestCol=c("red","green"))
+	    #输出多因素结果
+		write.table(outMultiTab,file="multiCox.txt",sep="\t",row.names=F,quote=F)
+		bioForest(coxFile="multiCox.txt",forestFile="trainmultiCox.pdf",forestCol=c("red","green"))
+	    write.table(testRiskOut,file="testRisk.txt",sep="\t",quote=F,row.names=F)
+		write.table(trainRiskOut,file="trainRisk.txt",sep="\t",quote=F,row.names=F)
+		#所有样品的风险值
+		allRiskOut=rbind(trainRiskOut, testRiskOut)
+		write.table(allRiskOut,file="allRisk.txt",sep="\t",quote=F,row.names=F)
+		break
+	}
+}
+
+##训练组和验证组的临床分组信息统计
+trainFile="train.data.txt"    #train组输入文件
+testFile="test.data.txt"      #test组输入文件
+cliFile="clinical0.txt"        #提供TCGA临床文件
+#读取train组文件
+train=read.table(trainFile, header=T, sep="\t", check.names=F, row.names=1)
+#读取test组文件
+test=read.table(testFile, header=T, sep="\t", check.names=F, row.names=1)
+#读取临床输入文件
+cli=read.table(cliFile, fill=TRUE, header=T, sep="\t", check.names=F, row.names=1)
+#合并数据
+trainCli=cli[row.names(train),]
+trainCli=cbind(trainCli, Type="Train")
+testCli=cli[row.names(test),]
+testCli=cbind(testCli, Type="Test")
+rt=rbind(trainCli, testCli)
+#输出表达统计结果
+cliStatOut=data.frame()
+for(i in 1:(ncol(rt)-1)){
+	nameStat=colnames(rt)[i]
+	tableStat=table(rt[,c(nameStat,"Type")])
+	tableStatSum=cbind(Total=rowSums(tableStat), tableStat)
+	tableStatRatio=prop.table(tableStatSum,2)
+	tableStatRatio=round(tableStatRatio*100,2)
+	tableStatPaste=paste(tableStatSum,"(",tableStatRatio,"%)",sep="")
+	tableStatOut=matrix(tableStatPaste,ncol=3,dimnames=dimnames(tableStatSum))
+	pStat=chisq.test(tableStat[row.names(tableStat)!="unknow",])
+	pValueStat=round(pStat$p.value,4)
+	pValueCol=c(pValueStat,rep(" ",(nrow(tableStatOut)-1)) )
+	tableStatOut=cbind(Covariates=nameStat,Type=row.names(tableStatOut),tableStatOut,Pvalue=pValueCol)
+	cliStatOut=rbind(cliStatOut,tableStatOut)
+}
+write.table(cliStatOut,file="cliStat.result.xls",sep="\t",quote=F,row.names=F)
+
+##用ROC检验模型
+#接受者操作特性曲线（receiver operating characteristic curve，ROC曲线）
+#install.packages("survminer")
+#引用包
+library(survival)
+library(survminer)
+library(timeROC)
+#定义绘制ROC曲线函数
+bioROC=function(inputFile=null, rocFile=null){
+	predictTime=1
+	#读取输入文件
+	rt=read.table(inputFile,header=T,sep="\t")
+	#ROC曲线
+	ROC_rt=timeROC(T=rt$futime, delta=rt$fustat,
+	               marker=rt$riskScore, cause=1,
+	               weighting='aalen',
+	               times=c(predictTime), ROC=TRUE)
+	pdf(file=rocFile, width=5, height=5)
+	plot(ROC_rt, time=predictTime, col='red', title=FALSE, lwd=2)
+	legend('bottomright', cex=1.3,
+           paste0('AUC=',sprintf("%.03f",ROC_rt$AUC[2])),
+	       col="white", lwd=1, bty = 'n')
+	dev.off()
+}
+bioROC(inputFile="trainRisk.txt",rocFile="train.ROC.pdf")
+bioROC(inputFile="testRisk.txt",rocFile="test.ROC.pdf")
+bioROC(inputFile="allRisk.txt",rocFile="all.ROC.pdf")
+
+##病人生存分析
+#引用包
+library(survival)
+library(survminer)
+#绘制生存曲线函数
+bioSurvival=function(inputFile=null,outFile=null){
+	#读取输入文件
+	rt=read.table(inputFile,header=T,sep="\t")
+	#比较高低风险组生存差异，得到显著性p值
+	diff=survdiff(Surv(futime, fustat) ~risk,data = rt)
+	pValue=1-pchisq(diff$chisq,df=1)
+	if(pValue<0.001){
+		pValue="p<0.001"
+	}else{
+		pValue=paste0("p=",sprintf("%.03f",pValue))
+	}
+	fit <- survfit(Surv(futime, fustat) ~ risk, data = rt)
+		
+	#绘制生存曲线
+	surPlot=ggsurvplot(fit, 
+		           data=rt,
+		           conf.int=T,
+		           pval=pValue,
+		           pval.size=6,
+		           legend.title="Risk",
+		           legend.labs=c("High risk", "Low risk"),
+		           xlab="Time(years)",
+		           break.time.by = 1,
+		           palette=c("red", "blue"),
+		           risk.table=TRUE,
+		       	   risk.table.title="",
+		           risk.table.col = "strata",
+		           risk.table.height=.25)
+	pdf(file=outFile,onefile = FALSE,width = 6.5,height =5.5)
+	print(surPlot)
+	dev.off()
+}
+bioSurvival(inputFile="trainRisk.txt",outFile="trainSurv.pdf")
+bioSurvival(inputFile="testRisk.txt",outFile="testSurv.pdf")
+bioSurvival(inputFile="allRisk.txt",outFile="allSurv.pdf")
+
+
+##2.2.5 Clinical factors independence and correlation analyses of GILPI
+##临床分组的模型验证
+#引用包
+library(survival)
+library(survminer)
+risk=read.table("allRisk.txt",header=T,sep="\t",check.names=F,row.names=1)      #读取风险文件
+cli=read.table("clinical0.txt",sep="\t",check.names=F,header=T,row.names=1)      #读取临床文件
+sameSample=intersect(row.names(cli),row.names(risk))
+risk=risk[sameSample,]
+cli=cli[sameSample,]
+data=cbind(futime=risk[,1],fustat=risk[,2],cli,risk=risk[,"risk"])
+#对临床信息进行循环
+for(i in colnames(data[,3:(ncol(data)-1)])){
+    rt=data[,c("futime","fustat",i,"risk")]
+    rt=rt[(rt[,i]!="unknow"),]
+    colnames(rt)=c("futime","fustat","clinical","risk")
+	tab=table(rt[,"clinical"])
+	tab=tab[tab!=0]
+	#对每个临床信息里面的分类进行循环
+	for(j in names(tab)){
+		rt1=rt[(rt[,"clinical"]==j),]
+		tab1=table(rt1[,"risk"])
+		tab1=tab1[tab1!=0]
+		labels=names(tab1)
+		if(length(labels)==2){
+			titleName=j
+			if((i=="age") | (i=="Age") | (i=="AGE")){
+				titleName=paste0("age",j)
+			}
+			diff=survdiff(Surv(futime, fustat) ~risk,data = rt1)
+			pValue=1-pchisq(diff$chisq,df=1)
+			if(pValue<0.001){
+				pValue="p<0.001"
+			}else{
+				pValue=paste0("p=",sprintf("%.03f",pValue))
+			}
+			fit <- survfit(Surv(futime, fustat) ~ risk, data = rt1)
+			#绘制生存曲线
+			surPlot=ggsurvplot(fit, 
+			           data=rt1,
+			           conf.int=F,
+			           pval=pValue,
+			           pval.size=6,
+			           title=paste0("Patients with ",titleName),
+			           legend.title="Risk",
+			           legend.labs=labels,
+			           font.legend=12,
+			           xlab="Time(years)",
+			           break.time.by = 1,
+			           palette=c("red", "blue"),
+			           risk.table=TRUE,
+			       	   risk.table.title="",
+			           risk.table.col = "strata",
+			           risk.table.height=.25)
+		    #输出图片
+		    j=gsub(">=","ge",j);j=gsub("<=","le",j);j=gsub(">","gt",j);j=gsub("<","lt",j)
+			pdf(file=paste0("survival.",i,"_",j,".pdf"),onefile = FALSE,
+			       width = 6,        #图片的宽度
+			       height =5)        #图片的高度
+			print(surPlot)
+			dev.off()
+		}
+	}
+}
+
+##TCGA数据库WGCNA风险的临床相关性
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install("ComplexHeatmap")
+library(ComplexHeatmap)
+riskFile="allRisk.txt"      #上面
+cliFile="clinical0.txt"        #TCGA临床数据文件，提供
+#读取风险文件
+risk=read.table(riskFile, header=T, sep="\t", check.names=F, row.names=1)
+risk=risk[order(risk$riskScore),] 
+#读取临床数据文件
+cli=read.table(cliFile,sep="\t",header=T,check.names=F,row.names=1)
+#合并数据
+samSample=intersect(row.names(risk), row.names(cli))
+risk=risk[samSample,"Risk",drop=F]
+cli=cli[samSample,,drop=F]
+rt=cbind(cli, risk)
+#临床相关性分析，得到显著性标记
+sigVec=c()
+for(clinical in colnames(rt[,1:(ncol(rt)-1)])){
+	data=rt[c("Risk", clinical)]
+	colnames(data)=c("Risk", "clinical")
+	data=data[(data[,"clinical"]!="unknow"),]
+	tableStat=table(data)
+	stat=chisq.test(tableStat)
+	pvalue=stat$p.value
+	Sig=ifelse(pvalue<0.001,"***",ifelse(pvalue<0.01,"**",ifelse(pvalue<0.05,"*","")))
+	sigVec=c(sigVec, paste0(clinical, Sig))
+	#print(tableStat)
+	#print(paste(clinical, pvalue, Sig, sep="\t"))
+}
+sigVec=c(sigVec, "Risk")
+colnames(rt)=sigVec
+rt$Risk=factor(rt$Risk, levels=c("low","high"))
+#定义热图注释的颜色
+#rt=rt[apply(rt,1,function(x)any(is.na(match('unknow',x)))),,drop=F]
+bioCol=c("#0066FF","#FF9900","#FF0000","#ed1299", "#0dbc21", "#246b93", "#cc8e12", "#d561dd", "#c93f00", 
+         "#ce2523", "#f7aa5d", "#9ed84e", "#39ba30", "#6ad157", "#373bbf", "#a1ce4c", "#ef3bb6", "#d66551",
+         "#1a918f", "#7149af", "#ff66fc", "#2927c4", "#57e559" ,"#8e3af4" ,"#f9a270" ,"#22547f", "#db5e92",
+         "#4aef7b", "#e86502",  "#99db27", "#e07233", "#8249aa","#cebb10", "#03827f", "#931635", "#ff523f",
+         "#edd05e", "#6f25e8", "#0dbc21", "#167275", "#280f7a", "#6373ed", "#5b910f" ,"#7b34c1" ,"#0cf29a" ,"#d80fc1",
+         "#dd27ce", "#07a301", "#ddd53e",  "#391c82", "#2baeb5","#925bea", "#09f9f5",  "#63ff4f")
+colorList=list()
+j=0
+for(cli in colnames(rt[,1:(ncol(rt)-1)])){
+	cliLength=length(levels(factor(rt[,cli])))
+	cliCol=bioCol[(j+1):(j+cliLength)]
+	j=j+cliLength
+	names(cliCol)=levels(factor(rt[,cli]))
+	cliCol["unknow"]="grey75"
+	colorList[[cli]]=cliCol
+}
+colorList[["Risk"]]=c("low"="blue", "high"="red")
+#绘制热图
+ha=HeatmapAnnotation(df=rt, col=colorList)
+zero_row_mat=matrix(nrow=0, ncol=nrow(rt))
+Hm=Heatmap(zero_row_mat, top_annotation=ha)
+#输出热图
+pdf(file="riskcli.heatmapTCGA.pdf", width=7, height=5) #输出
+draw(Hm, merge_legend=TRUE, heatmap_legend_side="bottom", annotation_legend_side="bottom")
+dev.off()
+
+
+##2.3. Applications of GILPI in predicting individualized immunotherapy, chemotherapy, and tumor evolutionary status
+##2.3.1 Predict individual response to immune checkpoint inhibitors (ICI)
+##TIDE打分与GILPI的相关性
+#肿瘤免疫功能障碍和免疫排斥Tumor Immune Dysfunction and Exclusion, TIDE
+#install.packages("ggpubr")
+library(limma)
+library(ggpubr)
+tideFile="TIDE_KIRP.txt"     #TIDE文件，提供
+riskFile="allrisk.txt"   #上面
+#读取TIDE数据
+tide=read.table(tideFile, header=T, sep="\t", check.names=F, row.names=1)
+group=sapply(strsplit(row.names(tide),"\\-"), "[", 4)
+group=sapply(strsplit(group,""), "[", 1)
+group=gsub("2", "1", group)
+tide=tide[group==0,]
+row.names(tide)=gsub("(.*?)\\-(.*?)\\-(.*?)\\-(.*?)\\-.*", "\\1\\-\\2\\-\\3", row.names(tide))
+tide=avereps(tide)
+#读取风险数据文件
+risk=read.table(riskFile, header=T, sep="\t", check.names=F, row.names=1)
+#合并数据
+sameSample=intersect(row.names(tide), row.names(risk))
+tide=tide[sameSample, , drop=F]
+risk=risk[sameSample, "Risk", drop=F]
+data=cbind(tide, risk)
+#设置比较组
+data$Risk=ifelse(data$Risk=="high", "GILPI-high", "GILPI-low")  #
+group=levels(factor(data$Risk))
+data$Risk=factor(data$Risk, levels=c("GILPI-low", "GILPI-high"))  #
+group=levels(factor(data$Risk))
+comp=combn(group,2)
+my_comparisons=list()
+for(i in 1:ncol(comp)){my_comparisons[[i]]<-comp[,i]}
+#对tide打分进行循环,分别绘制小提琴图
+for(i in colnames(data)[1:(ncol(data)-1)]){
+	gg1=ggviolin(data, x="Risk", y=i, fill = "Risk", 
+	         xlab="", ylab=i,
+	         palette=c("#0066FF","#FF0000"),
+	         legend.title="GILPI",
+	         add = "boxplot", add.params = list(fill="white"))+ 
+	         stat_compare_means(comparisons = my_comparisons,symnum.args=list(cutpoints = c(0, 0.001, 0.01, 0.05, 1), symbols = c("***", "**", "*", "ns")),label = "p.signif")
+	
+	pdf(file=paste0("GILPI.", i, ".pdf"), width=6, height=5) #输出多个文件
+	print(gg1)
+	dev.off()
+}
+
+##GILPI与TIDE, TIS模型的比较
+#install.packages("survival")
+#install.packages("survminer")
+#install.packages("timeROC")
+library(limma)
+library(survival)
+library(survminer)
+library(timeROC)
+expFile="mRNA.txt"         #TCGA lncRNA表达数据文件
+geneFile="geneTIS.txt" #TIS模型基因列表文件，提供
+riskFile="allrisk.txt"     #上面
+tideFile="TIDE_KIRP.txt"      #TIDE打分文件，提供
+#读取输入文件
+rt=read.table(expFile, header=T, sep="\t", check.names=F)
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp), colnames(exp))
+data=matrix(as.numeric(as.matrix(exp)), nrow=nrow(exp), dimnames=dimnames)
+data=avereps(data)
+#提取TIS基因表达量
+geneRT=read.table(geneFile, header=F, sep="\t", check.names=F)
+sameGene=intersect(as.vector(geneRT[,1]), row.names(data))
+geneExp=data[sameGene,]
+logData=log2(geneExp+1)
+TISscore=colMeans(logData)
+#读取TIDE打分文件
+TIDEscore=read.table(tideFile, header=T, sep="\t", check.names=F, row.names=1)
+sameSample=intersect(row.names(TIDEscore), names(TISscore))
+score=cbind(TIDEscore[sameSample,,drop=F], TIS=TISscore[sameSample])
+score=score[,c("TIDE","TIS")]
+#去除正常样品
+group=sapply(strsplit(row.names(score),"\\-"), "[", 4)
+group=sapply(strsplit(group,""), "[", 1)
+group=gsub("2", "1", group)
+score=score[group==0,]
+row.names(score)=gsub("(.*?)\\-(.*?)\\-(.*?)\\-(.*?)\\-.*", "\\1\\-\\2\\-\\3", row.names(score))
+score=avereps(score)
+#读取风险数据文件
+risk=read.table(riskFile, header=T, sep="\t", check.names=F, row.names=1)
+sameSample=intersect(row.names(score), row.names(risk))
+score=score[sameSample, , drop=F]
+risk=risk[sameSample, c("futime","fustat","riskScore"), drop=F]
+rt=cbind(risk, score)
+#绘制1 2 3年的ROC曲线
+bioCol=rainbow(ncol(rt)-2, s=0.9, v=0.9)
+ROC_rt=timeROC(T=risk$futime,delta=risk$fustat,
+	           marker=risk$riskScore,cause=1,
+	           weighting='aalen',
+	           times=c(1,2,3),ROC=TRUE)
+pdf(file="ROCwgcna.pdf", width=5.5, height=5.5)  #输出
+plot(ROC_rt,time=1,col=bioCol[1],title=FALSE,lwd=2)
+plot(ROC_rt,time=2,col=bioCol[2],add=TRUE,title=FALSE,lwd=2)
+plot(ROC_rt,time=3,col=bioCol[3],add=TRUE,title=FALSE,lwd=2)
+legend('bottomright',
+	   c(paste0('AUC at 1 years: ',sprintf("%.03f",ROC_rt$AUC[1])),
+	     paste0('AUC at 2 years: ',sprintf("%.03f",ROC_rt$AUC[2])),
+	     paste0('AUC at 3 years: ',sprintf("%.03f",ROC_rt$AUC[3]))),
+	   col=bioCol[1:3], lwd=2, bty = 'n')
+dev.off()
+
+##2.3.2 Evaluate tumor microenvironment (TME) based on GILPI
+CoreAlg <- function(X, y){
+  #try different values of nu
+  svn_itor <- 3
+  res <- function(i){
+    if(i==1){nus <- 0.25}
+    if(i==2){nus <- 0.5}
+    if(i==3){nus <- 0.75}
+    model<-e1071::svm(X,y,type="nu-regression",kernel="linear",nu=nus,scale=F)
+    model
+  }
+  if(Sys.info()['sysname'] == 'Windows') out <- parallel::mclapply(1:svn_itor, res, mc.cores=1) else
+    out <- parallel::mclapply(1:svn_itor, res, mc.cores=svn_itor)
+  nusvm <- rep(0,svn_itor)
+  corrv <- rep(0,svn_itor)
+  #do cibersort
+  t <- 1
+  while(t <= svn_itor) {
+    weights = t(out[[t]]$coefs) %*% out[[t]]$SV
+    weights[which(weights<0)]<-0
+    w<-weights/sum(weights)
+    u <- sweep(X,MARGIN=2,w,'*')
+    k <- apply(u, 1, sum)
+    nusvm[t] <- sqrt((mean((k - y)^2)))
+    corrv[t] <- cor(k, y)
+    t <- t + 1
+  }
+  #pick best model
+  rmses <- nusvm
+  mn <- which.min(rmses)
+  model <- out[[mn]]
+  #get and normalize coefficients
+  q <- t(model$coefs) %*% model$SV
+  q[which(q<0)]<-0
+  w <- (q/sum(q))
+  mix_rmse <- rmses[mn]
+  mix_r <- corrv[mn]
+  newList <- list("w" = w, "mix_rmse" = mix_rmse, "mix_r" = mix_r)
+}
+doPerm <- function(perm, X, Y){
+  itor <- 1
+  Ylist <- as.list(data.matrix(Y))
+  dist <- matrix()
+  while(itor <= perm){
+    #print(itor)
+    #random mixture
+    yr <- as.numeric(Ylist[sample(length(Ylist),dim(X)[1])])
+    #standardize mixture
+    yr <- (yr - mean(yr)) / sd(yr)
+    #run CIBERSORT core algorithm
+    result <- CoreAlg(X, yr)
+    mix_r <- result$mix_r
+    #store correlation
+    if(itor == 1) {dist <- mix_r}
+    else {dist <- rbind(dist, mix_r)}
+    itor <- itor + 1
+  }
+  newList <- list("dist" = dist)
+}
+CIBERSORT <- function(sig_matrix, mixture_file, perm=0, QN=TRUE){
+  #read in data
+  X <- read.table(sig_matrix,header=T,sep="\t",row.names=1,check.names=F)
+  Y <- read.table(mixture_file, header=T, sep="\t", check.names=F)
+  Y <- Y[!duplicated(Y[,1]),]
+  rownames(Y)<-Y[,1]
+  Y<-Y[,-1]
+  X <- data.matrix(X)
+  Y <- data.matrix(Y)
+  #order
+  X <- X[order(rownames(X)),]
+  Y <- Y[order(rownames(Y)),]
+  P <- perm #number of permutations
+  #anti-log if max < 50 in mixture file
+  if(max(Y) < 50) {Y <- 2^Y}
+  #quantile normalization of mixture file
+  if(QN == TRUE){
+    tmpc <- colnames(Y)
+    tmpr <- rownames(Y)
+    Y <- preprocessCore::normalize.quantiles(Y)
+    colnames(Y) <- tmpc
+    rownames(Y) <- tmpr
+  }
+  #intersect genes
+  Xgns <- row.names(X)
+  Ygns <- row.names(Y)
+  YintX <- Ygns %in% Xgns
+  Y <- Y[YintX,]
+  XintY <- Xgns %in% row.names(Y)
+  X <- X[XintY,]
+  #standardize sig matrix
+  X <- (X - mean(X)) / sd(as.vector(X))
+  if(P > 0) {nulldist <- sort(doPerm(P, X, Y)$dist)}
+  #print(nulldist)
+  header <- c('Mixture',colnames(X),"P-value","Correlation","RMSE")
+  #print(header)
+  output <- matrix()
+  itor <- 1
+  mixtures <- dim(Y)[2]
+  pval <- 9999
+  #iterate through mixtures
+  while(itor <= mixtures){
+    y <- Y[,itor]
+    #standardize mixture
+    y <- (y - mean(y)) / sd(y)
+    #run SVR core algorithm
+    result <- CoreAlg(X, y)
+    #get results
+    w <- result$w
+    mix_r <- result$mix_r
+    mix_rmse <- result$mix_rmse
+    #calculate p-value
+    if(P > 0) {pval <- 1 - (which.min(abs(nulldist - mix_r)) / length(nulldist))}
+    #print output
+    out <- c(colnames(Y)[itor],w,pval,mix_r,mix_rmse)
+    if(itor == 1) {output <- out}
+    else {output <- rbind(output, out)}
+    itor <- itor + 1
+  }
+  #save results
+  write.table(rbind(header,output), file="CIBERSORT-Results.txt", sep="\t", row.names=F, col.names=F, quote=F)
+  #return matrix object containing all results
+  obj <- rbind(header,output)
+  obj <- obj[,-1]
+  obj <- obj[-1,]
+  obj <- matrix(as.numeric(unlist(obj)),nrow=nrow(obj))
+  rownames(obj) <- colnames(Y)
+  colnames(obj) <- c(colnames(X),"P-value","Correlation","RMSE")
+  obj
+}
+rm(list = ls())#清空R参数
+options(stringsAsFactors = F)
+source("CIBERSORT.R")
+# 首先读取两个文件
+LM22.file <- "LM22.txt"# cibersoft 内置数据库挖掘资料中已有，不需要改动
+exp.file <- "all.txt"# 此处为输入文件我们采用TCGA数据库
+TME.results = CIBERSORT(LM22.file, exp.file, perm = 1000, QN = TRUE)
+#输出结果文件
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+cibersort_raw <- cibersort_raw <- read.table("CIBERSORT-Results.txt",header = T,sep = '\t') %>%
+  rename("Sample" = "Mixture") %>%
+   select(-c("P.value","Correlation","RMSE"))
+# 通过管道符一步步先将CIBERSORT_Results读入R语言中，并将其第一列列名“Mixture”修改为“Sample”。
+#并赋值给cibersort_raw。
+cibersort_tidy <- cibersort_raw %>%
+  remove_rownames() %>%
+  column_to_rownames("Sample")
+# 将cibersort_raw第一列变为列名后赋值给cibersort_tidy。
+flag <- apply(cibersort_tidy,2,function(x) sum(x == 0) < 
+                dim(cibersort_tidy)[1]/2)
+# 筛选出0值太多的一些细胞。
+cibersort_tidy <- cibersort_raw[,which(flag)] %>%
+  as.matrix() %>%
+  t()
+
+  
+##2.3.4 Predict individualized chemotherapy sensitivity based on GILPI
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install(c("car", "ridge", "preprocessCore", "genefilter", "sva"))
+#install.packages("ggpubr")
+library(limma)
+library(ggpubr)
+library(pRRophetic)
+library(ggplot2)
+set.seed(12345)
+expFile="lncRNA.txt"    #表达数据文件
+RiskFile="allrisk.txt"  #风险输入文件
+allDrugs=c("BAY.61.3606",
+           "Bexarotene",
+           "BI.2536",
+           "BIBW2992",
+           "Bicalutamide",
+           "BI.D1870",
+           "BIRB.0796", 
+           "Bleomycin", 
+           "BMS.509744",
+           "BMS.536924", 
+           "BMS.708163", 
+           "BMS.754807",
+           "Bortezomib",
+           "Bosutinib", 
+           "Bryostatin.1", 
+           "BX.795", 
+           "Camptothecin", 
+           "CCT007093", 
+           "CCT018159", 
+           "CEP.701", 
+           "CGP.082996", 
+           "CGP.60474", 
+           "CHIR.99021",
+           "CI.1040", 
+           "Cisplatin",
+           "CMK",
+           "Cyclopamine", 
+           "Cytarabine", 
+           "Dasatinib",
+           "DMOG",
+           "Docetaxel", 
+           "Doxorubicin", 
+           "EHT.1864",
+           "Elesclomol", 
+           "Embelin",
+           "Epothilone.B",
+           "Erlotinib", 
+           "Etoposide", 
+           "FH535", 
+           "FTI.277", 
+           "GDC.0449", 
+           "GDC0941",
+           "Gefitinib", 
+           "Gemcitabine", 
+           "GNF.2",
+           "GSK269962A", 
+           "GSK.650394", 
+           "GW.441756",
+           "GW843682X", 
+           "Imatinib",
+           "IPA.3",
+           "JNJ.26854165", 
+           "JNK.9L", 
+           "JNK.Inhibitor.VIII", 
+           "JW.7.52.1", 
+           "KIN001.135", 
+           "KU.55933",
+           "Lapatinib",
+           "Lenalidomide", 
+           "LFM.A13", 
+           "Metformin", 
+           "Methotrexate", 
+           "MG.132", 
+           "Midostaurin", 
+           "Mitomycin.C",
+           "MK.2206", 
+           "MS.275",
+           "Nilotinib", 
+           "NSC.87877",
+           "NU.7441", 
+           "Nutlin.3a", 
+           "NVP.BEZ235", 
+           "NVP.TAE684",
+           "Obatoclax.Mesylate",
+           "OSI.906", 
+           "PAC.1", 
+           "Paclitaxel", 
+           "Parthenolide",
+           "Pazopanib", 
+           "PD.0325901", 
+           "PD.0332991", 
+           "PD.173074", 
+           "PF.02341066", 
+           "PF.4708671", 
+           "PF.562271",
+           "PHA.665752",
+           "PLX4720", 
+           "Pyrimethamine",
+           "QS11", 
+           "Rapamycin",
+           "RDEA119", 
+           "RO.3306", 
+           "Roscovitine", 
+           "Salubrinal",
+           "SB.216763", 
+           "SB590885", 
+           "Shikonin",
+           "SL.0101.1", 
+           "Sorafenib",
+           "S.Trityl.L.cysteine", 
+           "Sunitinib", 
+           "Temsirolimus",
+           "Thapsigargin", 
+           "Tipifarnib", 
+           "TW.37",
+           "Vinblastine", 
+           "Vinorelbine", 
+           "Vorinostat",
+           "VX.702", 
+           "WH.4.023", 
+           "WO2009093972",
+           "WZ.1.84",
+           "X17.AAG", 
+           "X681640",
+           "XMD8.85",
+           "Z.LLNle.CHO", 
+           "ZM.447439",
+           "A-443654", 
+           "A-770041",
+           "ABT.263", 
+           "ABT.888", 
+           "AG.014699",
+           "AICAR", 
+           "AKT.inhibitor.VIII",
+           "AMG.706", 
+           "AP.24534", 
+           "AS601245",
+           "ATRA",
+           "AUY922", 
+           "Axitinib",
+           "AZ628", 
+           "AZD.0530",  
+           "AZD6244", 
+           "AZD6482", 
+           "AZD7762", 
+           "AZD8055")
+#读取表达输入文件,并对数据进行处理
+rt = read.table(expFile, header=T, sep="\t", check.names=F)
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp),colnames(exp))
+data=matrix(as.numeric(as.matrix(exp)),nrow=nrow(exp),dimnames=dimnames)
+data=avereps(data)
+data=data[rowMeans(data)>0.5,]
+#删掉正常样品
+group=sapply(strsplit(colnames(data),"\\-"), "[", 4)
+group=sapply(strsplit(group,""), "[", 1)
+group=gsub("2","1",group)
+data=data[,group==0]
+data=t(data)
+rownames(data)=gsub("(.*?)\\-(.*?)\\-(.*?)\\-(.*)", "\\1\\-\\2\\-\\3", rownames(data))
+data=avereps(data)
+data=t(data)
+#读取风险输入文件
+RiskRT=read.table(RiskFile, header=T, sep="\t", check.names=F, row.names=1)
+for(drug in allDrugs){
+	#预测药物敏感性
+	senstivity=pRRopheticPredict(data, drug, selection=1)
+	senstivity=senstivity[senstivity!="NaN"]
+	#senstivity[senstivity>quantile(senstivity,0.99)]=quantile(senstivity,0.99)
+	#风险文件和药物敏感性结果合并
+	sameSample=intersect(row.names(RiskRT), names(senstivity))
+	Risk=RiskRT[sameSample, "Risk",drop=F]  #Risk
+	senstivity=senstivity[sameSample]
+	rt=cbind(Risk, senstivity)
+	#设置比较组
+	rt$Risk=factor(rt$Risk, levels=c("low", "high"))
+	type=levels(factor(rt[,"Risk"]))  #
+	comp=combn(type, 2)
+	my_comparisons=list()
+	for(i in 1:ncol(comp)){my_comparisons[[i]]<-comp[,i]}
+	#获取高低风险组差异pvalue
+	test=wilcox.test(senstivity~Risk, data=rt)  #
+	if(test$p.value<0.05){
+		#绘制箱线图
+		boxplot=ggboxplot(rt, x="Risk", y="senstivity", fill="Risk",
+					      xlab="Risk",
+					      ylab=paste0(drug, " senstivity (IC50)"),
+					      legend.title="Risk",
+					      palette=c("#0066FF","#FF0000")
+					     )+ 
+			stat_compare_means(comparisons=my_comparisons)
+		pdf(file=paste0("durgSenstivityTCGA.", drug, ".pdf"), width=5, height=4.5)
+		print(boxplot)
+		dev.off()
+	}
+}
+
+
+##2.3.5 Assess individual tumor evolutionary status
+##肿瘤干细胞指数stemness indices
+#install.packages("ggplot2")
+#install.packages("ggpubr")
+#install.packages("ggExtra")
+library(limma)
+library(ggplot2)
+library(ggpubr)
+library(ggExtra)
+#肿瘤lncRNA表达的干细胞指数(stemness indices)
+riskFile="allrisk.txt"       #lncRNA风险文件,复制过来
+RNAssFile="StemnessScores_RNAexp_20170127.2.tsv" #干细胞打分文件，提供
+#读取风险文件
+risk=read.table(riskFile, header=T, sep="\t", check.names=F, row.names=1)
+#读取RNA干细胞打分文件
+RNAss=read.table(RNAssFile, header=T, sep="\t",check.names=F, row.names=1)
+RNAss=t(RNAss[1,,drop=F])
+rownames(RNAss)=gsub("(.*?)\\-(.*?)\\-(.*?)\\-.*", "\\1\\-\\2\\-\\3", rownames(RNAss))
+RNAss=avereps(RNAss)
+#样品取交集
+sameSample=intersect(row.names(risk), row.names(RNAss))
+risk=risk[sameSample,"riskScore",drop=F]
+RNAss=RNAss[sameSample,,drop=F]
+data=cbind(RNAss, risk)
+#绘制相关性散点图
+xlab="riskScore"
+ylab="RNAss"
+outFile="RNAss.cor.pdf"
+x=as.numeric(data[,xlab])
+x[x>quantile(x,0.99)]=quantile(x,0.99)
+y=as.numeric(data[,ylab])
+df1=as.data.frame(cbind(x,y))
+p1=ggplot(df1, aes(x, y)) + 
+		  xlab("Risk score") + ylab(ylab)+ ylim(0,0.7)+
+		  geom_point() + geom_smooth(method="lm",formula = y ~ x) + theme_bw()+
+		  stat_cor(method = 'spearman', aes(x =x, y =y))
+p2=ggMarginal(p1, type="density", xparams=list(fill = "orange"), yparams=list(fill = "blue"))
+#相关性图形
+pdf(file=outFile, width=5.2, height=5)
+print(p2)
+dev.off()
+
+##肿瘤EREG表达的干性指数(EREG-stemness indices)
+riskFile="allrisk.txt"       #风险文件
+EREG.EXPssFile="StemnessScores_RNAexp_20170127.2.tsv"           #干细胞打分文件
+#读取风险文件
+risk=read.table(riskFile, header=T, sep="\t", check.names=F, row.names=1)
+#读取RNA干细胞打分文件
+EREG.EXPss=read.table(EREG.EXPssFile, header=T, sep="\t",check.names=F, row.names=1)
+EREG.EXPss=t(EREG.EXPss[2,,drop=F]) 
+rownames(EREG.EXPss)=gsub("(.*?)\\-(.*?)\\-(.*?)\\-.*", "\\1\\-\\2\\-\\3", rownames(EREG.EXPss))
+EREG.EXPss=avereps(EREG.EXPss)
+#样品取交集
+sameSample=intersect(row.names(risk), row.names(EREG.EXPss))
+risk=risk[sameSample,"riskScore",drop=F]
+EREG.EXPss=EREG.EXPss[sameSample,,drop=F]
+data=cbind(EREG.EXPss, risk)
+#绘制相关性散点图
+xlab="riskScore"
+ylab="EREG.EXPss"
+outFile="EREG.EXPss.cor.pdf"
+x=as.numeric(data[,xlab])
+x[x>quantile(x,0.99)]=quantile(x,0.99)
+y=as.numeric(data[,ylab])
+df1=as.data.frame(cbind(x,y))
+p1=ggplot(df1, aes(x, y)) + 
+		  xlab("Risk score") + ylab(ylab)+ ylim(0,0.7)+
+		  geom_point() + geom_smooth(method="lm",formula = y ~ x) + theme_bw()+
+		  stat_cor(method = 'spearman', aes(x =x, y =y))
+p2=ggMarginal(p1, type="density", xparams=list(fill = "orange"), yparams=list(fill = "blue"))
+#相关性图形
+pdf(file=outFile, width=5.2, height=5)
+print(p2)
+dev.off()
+
+
+##2.4. Identify key lncRNAs associated with biological functions of PRCC based on weighted gene co-expression network analysis (WGCNA)
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install(c("GO.db", "preprocessCore", "impute"))
+#install.packages(c("matrixStats", "Hmisc", "foreach", "doParallel", "fastcluster", "dynamicTreeCut")) 
+#install.packages("WGCNA")
+library("WGCNA")          
+library("limma")    
+expFile="lncRNA.txt"     #输入文件,来自\01
+normalCount=32   #正常样品数目
+tumorCount=289     #肿瘤样品数目
+#读取文件,并对输入文件整理
+rt=read.table(expFile,sep="\t",header=T,check.names=F)
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp),colnames(exp))
+data=matrix(as.numeric(as.matrix(exp)),nrow=nrow(exp),dimnames=dimnames)
+data=avereps(data)
+data=log2(data+1)
+data=data[apply(data,1,sd)>0.5,] #0.5
+datExpr0=t(data)
+###检查缺失值
+gsg = goodSamplesGenes(datExpr0, verbose = 3)
+if (!gsg$allOK)
+{
+  # Optionally, print the gene and sample names that were removed:
+  if (sum(!gsg$goodGenes)>0)
+    printFlush(paste("Removing genes:", paste(names(datExpr0)[!gsg$goodGenes], collapse = ", ")))
+  if (sum(!gsg$goodSamples)>0)
+    printFlush(paste("Removing samples:", paste(rownames(datExpr0)[!gsg$goodSamples], collapse = ", ")))
+  # Remove the offending genes and samples from the data:
+  datExpr0 = datExpr0[gsg$goodSamples, gsg$goodGenes]
+}
+###样品聚类
+sampleTree = hclust(dist(datExpr0), method = "average")
+pdf(file = "1_sample_cluster.pdf", width = 12, height = 9)
+par(cex = 0.6)
+par(mar = c(0,4,2,0))
+plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="", cex.lab = 1.5, cex.axis = 1.5, cex.main = 2)
+###剪切线
+abline(h = 20000, col = "red")
+dev.off()
+###删除剪切线以下的样品
+clust = cutreeStatic(sampleTree, cutHeight = 20000, minSize = 10)
+table(clust)
+keepSamples = (clust==1)
+datExpr0 = datExpr0[keepSamples, ]
+###准备临床数据
+traitData=data.frame(Normal=c(rep(1,normalCount),rep(0,tumorCount)),
+                     Tumor=c(rep(0,normalCount),rep(1,tumorCount)))
+row.names(traitData)=colnames(data)
+fpkmSamples = rownames(datExpr0)
+traitSamples =rownames(traitData)
+sameSample=intersect(fpkmSamples,traitSamples)
+datExpr0=datExpr0[sameSample,]
+datTraits=traitData[sameSample,]
+###样品聚类的热图
+sampleTree2 = hclust(dist(datExpr0), method = "average")
+traitColors = numbers2colors(datTraits, signed = FALSE)
+pdf(file="2_sample_heatmap.pdf",width=15,height=12)
+plotDendroAndColors(sampleTree2, traitColors,
+                    groupLabels = names(datTraits),
+                    main = "Sample dendrogram and trait heatmap")
+dev.off()
+###power值散点图
+enableWGCNAThreads()   #多线程工作
+powers = c(1:20)       #幂指数范围1:20
+sft = pickSoftThreshold(datExpr0, powerVector = powers, verbose = 5)
+pdf(file="3_scale_independence.pdf",width=9,height=5)
+par(mfrow = c(1,2))
+cex1 = 0.9
+###拟合指数与power值散点图
+plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+     main = paste("Scale independence"));
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     labels=powers,cex=cex1,col="red");
+abline(h=0.90,col="red")
+###平均连通性与power值散点图
+plot(sft$fitIndices[,1], sft$fitIndices[,5],
+     xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
+     main = paste("Mean connectivity"))
+text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers, cex=cex1,col="red")
+dev.off()
+###邻接矩阵转换
+sft #查看最佳power值
+#[1] 
+softPower =sft$powerEstimate #最佳power值
+adjacency = adjacency(datExpr0, power = softPower)
+softPower   
+###TOM矩阵
+TOM = TOMsimilarity(adjacency);
+dissTOM = 1-TOM
+###基因聚类
+geneTree = hclust(as.dist(dissTOM), method = "average");
+pdf(file="4_gene_clustering.pdf",width=12,height=9)
+plot(geneTree, xlab="", sub="", main = "Gene clustering on TOM-based dissimilarity",
+     labels = FALSE, hang = 0.04)
+dev.off()
+###动态剪切模块识别
+minModuleSize = 50      #模块基因数目
+dynamicMods = cutreeDynamic(dendro = geneTree, distM = dissTOM,
+                            deepSplit = 2, pamRespectsDendro = FALSE,
+                            minClusterSize = minModuleSize);
+table(dynamicMods)
+dynamicColors = labels2colors(dynamicMods)
+table(dynamicColors)
+pdf(file="5_Dynamic_Tree.pdf",width=8,height=6)
+plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut",
+                    dendroLabels = FALSE, hang = 0.03,
+                    addGuide = TRUE, guideHang = 0.05,
+                    main = "Gene dendrogram and module colors")
+dev.off()
+###相似模块聚类
+MEList = moduleEigengenes(datExpr0, colors = dynamicColors)
+MEs = MEList$eigengenes
+MEDiss = 1-cor(MEs);
+METree = hclust(as.dist(MEDiss), method = "average")
+pdf(file="6_Clustering_module.pdf",width=7,height=6)
+plot(METree, main = "Clustering of module eigengenes",
+     xlab = "", sub = "")
+MEDissThres = 0.25 #剪切高度可修改
+abline(h=MEDissThres, col = "red")
+dev.off()
+###相似模块合并
+merge = mergeCloseModules(datExpr0, dynamicColors, cutHeight = MEDissThres, verbose = 3)
+mergedColors = merge$colors
+mergedMEs = merge$newMEs
+pdf(file="7_merged_dynamic.pdf", width = 9, height = 6)
+plotDendroAndColors(geneTree, mergedColors,"Dynamic Tree Cut",
+                    dendroLabels = FALSE, hang = 0.03,
+                    addGuide = TRUE, guideHang = 0.05,
+                    main = "Gene dendrogram and module colors(TCGA)")
+dev.off()
+moduleColors = mergedColors
+table(moduleColors)
+colorOrder = c("grey", standardColors(50))
+moduleLabels = match(moduleColors, colorOrder)-1
+MEs = mergedMEs
+###模块与性状数据热图
+nGenes = ncol(datExpr0)
+nSamples = nrow(datExpr0)
+moduleTraitCor = cor(MEs, datTraits, use = "p")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
+pdf(file="8_Module_trait.pdf",width=6,height=6)
+textMatrix = paste(signif(moduleTraitCor, 2), "\n(",
+                   signif(moduleTraitPvalue, 1), ")", sep = "")
+dim(textMatrix) = dim(moduleTraitCor)
+par(mar = c(5, 10, 3, 3))
+labeledHeatmap(Matrix = moduleTraitCor,
+               xLabels = names(datTraits),
+               yLabels = names(MEs),
+               ySymbols = names(MEs),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships(TCGA)"))
+dev.off()
+###模块(module membership，MM)和基因（gene significance,GS）的相关性
+modNames = substring(names(MEs), 3)
+geneModuleMembership = as.data.frame(cor(datExpr0, MEs, use = "p"))
+MMPvalue = as.data.frame(corPvalueStudent(as.matrix(geneModuleMembership), nSamples))
+names(geneModuleMembership) = paste("MM", modNames, sep="")
+names(MMPvalue) = paste("p.MM", modNames, sep="")
+traitNames=names(datTraits)
+geneTraitSignificance = as.data.frame(cor(datExpr0, datTraits, use = "p"))
+GSPvalue = as.data.frame(corPvalueStudent(as.matrix(geneTraitSignificance), nSamples))
+names(geneTraitSignificance) = paste("GS.", traitNames, sep="")
+names(GSPvalue) = paste("p.GS.", traitNames, sep="")
+###批量输出性状和模块散点图
+for (trait in traitNames){
+  traitColumn=match(trait,traitNames)  
+  for (module in modNames){
+    column = match(module, modNames)
+    moduleGenes = moduleColors==module
+    if (nrow(geneModuleMembership[moduleGenes,]) > 1){
+      outPdf=paste("9_", trait, "_", module,".pdf",sep="")
+      pdf(file=outPdf,width=7,height=7)
+      par(mfrow = c(1,1))
+      verboseScatterplot(abs(geneModuleMembership[moduleGenes, column]),
+                         abs(geneTraitSignificance[moduleGenes, traitColumn]),
+                         xlab = paste("Module Membership in", module, "module"),
+                         ylab = paste("Gene significance for ",trait),
+                         main = paste("Module membership vs. gene significance\n"),
+                         cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2, col = module)
+      abline(v=0.8,h=0.5,col="red")
+      dev.off()
+    }
+  }
+}
+###输出GS_MM数据
+probes = colnames(datExpr0)
+geneInfo0 = data.frame(probes= probes,
+                       moduleColor = moduleColors)
+for (Tra in 1:ncol(geneTraitSignificance))
+{
+  oldNames = names(geneInfo0)
+  geneInfo0 = data.frame(geneInfo0, geneTraitSignificance[,Tra],
+                         GSPvalue[, Tra])
+  names(geneInfo0) = c(oldNames,names(geneTraitSignificance)[Tra],
+                       names(GSPvalue)[Tra])
+}
+for (mod in 1:ncol(geneModuleMembership))
+{
+  oldNames = names(geneInfo0)
+  geneInfo0 = data.frame(geneInfo0, geneModuleMembership[,mod],
+                         MMPvalue[, mod])
+  names(geneInfo0) = c(oldNames,names(geneModuleMembership)[mod],
+                       names(MMPvalue)[mod])
+}
+geneOrder =order(geneInfo0$moduleColor)
+geneInfo = geneInfo0[geneOrder, ]
+write.table(geneInfo, file = "GS_MM.xls",sep="\t",row.names=F)
+###输出每个模块的基因
+for (mod in 1:nrow(table(moduleColors)))
+{  
+  modules = names(table(moduleColors))[mod]
+  probes = colnames(datExpr0)
+  inModule = (moduleColors == modules)
+  modGenes = probes[inModule]
+  write.table(modGenes, file =paste0("TCGA_",modules,".txt"),sep="\t",row.names=F,col.names=F,quote=F)
+}
+
+
+##The codes from 2.5. to 2.8. were similar to the above.
+
+
+##2.9. Superiority of combined GILPI-WGLPI in survival analysis, sensitive immunotherapy, and chemotherapy
+##2.9.1 Comparison between GILPI and WGLPI
+##两个模型的ROC曲线比较
+#引用包
+library(limma)
+library(survival)
+library(survminer)
+library(timeROC)
+riskFile="allRisk.txt"     #GILPI的风险文件
+expFile="lncRNA.txt"       #表达数据文件
+cliFile="time.txt"         #临床数据文件
+geneFiles=c("WGLncSig.txt")  #WGLPI模型的基因文件
+#读取表达文件，并对输入文件整理
+rt=read.table(expFile, header=T, sep="\t", check.names=F)
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp), colnames(exp))
+data=matrix(as.numeric(as.matrix(exp)), nrow=nrow(exp), dimnames=dimnames)
+data=avereps(data)
+data=data[rowMeans(data)>0,]
+#删掉正常样品
+group=sapply(strsplit(colnames(data),"\\-"),"[",4)
+group=sapply(strsplit(group,""),"[",1)
+group=gsub("2", "1", group)
+data=data[,group==0]
+#读取风险文件
+riskRT=read.table(riskFile, header=T, sep="\t", check.names=F, row.names=1)
+riskRT=riskRT[,c("futime","fustat","riskScore")]
+colnames(riskRT)=c("futime","fustat","GILncSig")
+for(i in geneFiles){
+	#读取基因列表
+	header=unlist(strsplit(i, "\\."))
+	gene=read.table(i, header=F, sep="\t", check.names=F)
+	sameGene=intersect(as.vector(gene[,1]), row.names(data))
+	data1=data[sameGene,]
+	colnames(data1)=gsub("(.*?)\\-(.*?)\\-(.*?)\\-.*", "\\1\\-\\2\\-\\3", colnames(data1))
+	data1=t(data1)
+	data1=avereps(data1)
+	#读取生存数据
+	cli=read.table(cliFile,sep="\t",check.names=F,header=T,row.names=1)
+	cli$futime=cli$futime/365
+	#数据合并并输出结果
+	sameSample=intersect(row.names(data1), row.names(cli))
+	data1=data1[sameSample,]
+	cli=cli[sameSample,]
+	data1=cbind(cli,data1)
+	#计算得分
+	multiCox=coxph(Surv(futime, fustat) ~ ., data = data1)
+	riskScore=predict(multiCox,type="risk", newdata=data1)
+	data1=cbind(data1, riskScore)
+	data1=data1[row.names(riskRT),]
+	riskRT=cbind(riskRT, data1[,"riskScore"])
+	colnames(riskRT)[ncol(riskRT)]=header[[1]]
+}
+#如果失败Error in `colnames<-`(`*tmp*`, value = gsub("(.*?)\\-(.*?)\\-(.*?)\\-.*",  : 
+  #不能给维度小于二的对象设'colnames'
+  #报错原因是外部模型基因文件有lncRNA名称在表达数据文件lncRNA.txt中不存在，解决办法。。。。
+#绘制ROC曲线
+predictTime=1
+bioCol=rainbow(ncol(riskRT)-2)
+aucText=c()
+pdf(file="ROC_GILPI-WGLPI.pdf", width=6, height=6)
+i=3
+ROC_rt=timeROC(T=riskRT$futime,delta=riskRT$fustat,marker=riskRT[,i],cause=1,weighting='aalen',times=c(predictTime),ROC=TRUE)
+plot(ROC_rt, time=predictTime, col=bioCol[i-2], title=FALSE, lwd=2)
+aucText=c(paste0(colnames(riskRT)[i],", AUC=",sprintf("%.3f",ROC_rt$AUC[2])))
+abline(0,1)
+for(i in 4:ncol(riskRT)){
+	ROC_rt=timeROC(T=riskRT$futime,delta=riskRT$fustat,marker=riskRT[,i],cause=1,weighting='aalen',times=c(predictTime),ROC=TRUE)
+	plot(ROC_rt,time=predictTime,col=bioCol[i-2],title=FALSE,lwd=2,add=TRUE)
+	aucText=c(aucText,paste0(colnames(riskRT)[i],", AUC=",sprintf("%.3f",ROC_rt$AUC[2])))
+}
+legend("bottomright", aucText,lwd=2,bty="n",col=bioCol[1:(ncol(rt)-2)])
+dev.off()
+
+#2.9.2 Combined application of GILPI-WGLPI in survival analysis
+##GILPI-WGLPI联合生存分析
+#引用包
+library(survival)
+library(survminer)
+clusterFile="WGLPI-cluster.txt"     #分型输入文件,来自01文件夹
+mutFile="GILPI-cluster.txt"       #突变矩阵文件
+cliFile="time.txt"            #临床数据文件
+gene="GILPI"                    #基因名字
+#读取聚类输入文件
+cluster=read.table(clusterFile, header=F, sep="\t", check.names=F, row.names=1)
+cluster=as.matrix(cluster)
+row.names(cluster)=gsub("(.*?)\\-(.*?)\\-(.*?)\\-.*", "\\1\\-\\2\\-\\3\\",  row.names(cluster))
+#读取突变输入文件
+mut=read.table(mutFile, header=T, sep="\t", check.names=F, row.names=1)
+mut=t(mut[gene,])
+row.names(mut)=gsub("(.*?)\\-(.*?)\\-(.*?)\\-.*", "\\1\\-\\2\\-\\3\\",  row.names(mut))
+#合并聚类和突变数据
+sameSample=intersect(row.names(mut), row.names(cluster))
+mut=mut[sameSample,]
+cluster=cluster[sameSample,]
+rt=cbind(as.data.frame(mut), as.data.frame(cluster))
+#读取临床数据文件
+cli=read.table(cliFile, header=T, sep="\t", check.names=F, row.names=1)
+cli$futime=cli$futime/365
+sameSample=intersect(row.names(rt), row.names(cli))
+rt=cbind(cli[sameSample,], rt[sameSample,])
+#合并变量
+Type=paste0(gene, " ", rt[,"mut"], "/" , rt[,"cluster"])
+rt=cbind(rt, Type)
+#生存差异统计
+length=length(levels(factor(Type)))
+diff=survdiff(Surv(futime, fustat) ~ Type,data = rt)
+pValue=1-pchisq(diff$chisq, df=length-1)
+if(pValue<0.001){
+	pValue="p<0.001"
+}else{
+	pValue=paste0("p=",sprintf("%.03f",pValue))
+}
+fit <- survfit(Surv(futime, fustat) ~ Type, data = rt)
+#绘制生存曲线
+surPlot=ggsurvplot(fit, 
+		           data=rt,
+		           conf.int=F,
+		           pval=pValue,
+		           pval.size=5,
+		           legend.title="Type",
+		           legend.labs=levels(factor(rt[,"Type"])),
+		           legend = "right",
+		           xlab="Time(years)",
+		           break.time.by = 1,
+		           risk.table=T,
+		           risk.table.title="",
+		           risk.table.height=.3)
+pdf(file="GILPI-WGLPI_survival.pdf", onefile=FALSE, width=8, height=6)
+print(surPlot)
+dev.off()
