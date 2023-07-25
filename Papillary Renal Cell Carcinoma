@@ -1,5 +1,5 @@
-##2.1. Explore pathogenesis pathways of PRCC 
-##2.1.1 Identify DEGs between normal and PRCC
+##3.1. Explore pathogenesis pathways of PRCC 
+##3.1.1 Identify DEGs between normal and PRCC
 #mRNA的差异表达分析
 #if (!requireNamespace("BiocManager", quietly = TRUE))
 #    install.packages("BiocManager")
@@ -164,7 +164,7 @@ abline(v=0,lty=2,lwd=3)
 dev.off()
 
 
-##2.1.2 Functional enrichment analysis based on GO and KEGG
+##3.1.2 Functional enrichment analysis based on GO and KEGG
 #用差异mRNA和差异lncRNA构建共表达网络分析
 library(limma)            #引用包
 lncFile="lncRNADiffExp.txt"      #lncRNA差异表达文件
@@ -356,8 +356,8 @@ pdf(file="bubble_KEGG.pdf", width = 9, height = 7)
 dotplot(kk, showCategory=showNum, orderBy="GeneRatio", color=colorSel)
 dev.off()
 
-##2.2 Construct genomic instability-derived lncRNA prognostic index (GILPI) computational framework
-##2.2.1 Identify genomic instability-derived lncRNA set (GILncSet)
+##3.2 Construct genomic instability-derived lncRNA prognostic index (GILPI) computational framework
+##3.2.1 Identify genomic instability-derived lncRNA set (GILncSet)
 ##根据GS和GU分类的差异表达LncRNA
 #引用包
 library(limma)
@@ -437,8 +437,8 @@ pheatmap(hmExp,
 dev.off()
 
 
-##2.2.3 Construct GILPI computational framework in the training group
-##2.2.4 Verify the reliability of the GILPI computational framework in the testing group and the TCGA group
+##3.2.3 Construct GILPI computational framework in the training group
+##3.2.4 Verify the reliability of the GILPI computational framework in the testing group and the TCGA group
 ##预后模型构建
 #IncRNA表达文件与time文件合并
 #if (!requireNamespace("BiocManager", quietly = TRUE))
@@ -728,7 +728,7 @@ bioSurvival(inputFile="testRisk.txt",outFile="testSurv.pdf")
 bioSurvival(inputFile="allRisk.txt",outFile="allSurv.pdf")
 
 
-##2.2.5 Clinical factors independence and correlation analyses of GILPI
+##3.2.5 Clinical factors independence and correlation analyses of GILPI
 ##临床分组的模型验证
 #引用包
 library(survival)
@@ -856,8 +856,8 @@ draw(Hm, merge_legend=TRUE, heatmap_legend_side="bottom", annotation_legend_side
 dev.off()
 
 
-##2.3. Applications of GILPI in predicting individualized immunotherapy, chemotherapy, and tumor evolutionary status
-##2.3.1 Predict individual response to immune checkpoint inhibitors (ICI)
+##3.3. Applications of GILPI in predicting individualized immunotherapy, chemotherapy, and tumor evolutionary status
+##3.3.1 Predict individual response to immune checkpoint inhibitors (ICI)
 ##TIDE打分与GILPI的相关性
 #肿瘤免疫功能障碍和免疫排斥Tumor Immune Dysfunction and Exclusion, TIDE
 #install.packages("ggpubr")
@@ -963,7 +963,7 @@ legend('bottomright',
 	   col=bioCol[1:3], lwd=2, bty = 'n')
 dev.off()
 
-##2.3.2 Evaluate tumor microenvironment (TME) based on GILPI
+##3.3.2 Evaluate tumor microenvironment (TME) based on GILPI
 CoreAlg <- function(X, y){
   #try different values of nu
   svn_itor <- 3
@@ -1120,7 +1120,7 @@ cibersort_tidy <- cibersort_raw[,which(flag)] %>%
   t()
 
   
-##2.3.4 Predict individualized chemotherapy sensitivity based on GILPI
+##3.3.4 Predict individualized chemotherapy sensitivity based on GILPI
 #if (!requireNamespace("BiocManager", quietly = TRUE))
 #    install.packages("BiocManager")
 #BiocManager::install(c("car", "ridge", "preprocessCore", "genefilter", "sva"))
@@ -1322,7 +1322,7 @@ for(drug in allDrugs){
 }
 
 
-##2.3.5 Assess individual tumor evolutionary status
+##3.3.5 Assess individual tumor evolutionary status
 ##肿瘤干细胞指数stemness indices
 #install.packages("ggplot2")
 #install.packages("ggpubr")
@@ -1398,7 +1398,7 @@ print(p2)
 dev.off()
 
 
-##2.4. Identify key lncRNAs associated with biological functions of PRCC based on weighted gene co-expression network analysis (WGCNA)
+##3.4. Identify key lncRNAs associated with biological functions of PRCC based on weighted gene co-expression network analysis (WGCNA)
 #if (!requireNamespace("BiocManager", quietly = TRUE))
 #    install.packages("BiocManager")
 #BiocManager::install(c("GO.db", "preprocessCore", "impute"))
@@ -1629,8 +1629,8 @@ for (mod in 1:nrow(table(moduleColors)))
 ##The codes from 2.5. to 2.8. were similar to the above.
 
 
-##2.9. Superiority of combined GILPI-WGLPI in survival analysis, sensitive immunotherapy, and chemotherapy
-##2.9.1 Comparison between GILPI and WGLPI
+##3.9. Superiority of combined GILPI-WGLPI in survival analysis, sensitive immunotherapy, and chemotherapy
+##3.9.1 Comparison between GILPI and WGLPI
 ##两个模型的ROC曲线比较
 #引用包
 library(limma)
@@ -1705,7 +1705,7 @@ for(i in 4:ncol(riskRT)){
 legend("bottomright", aucText,lwd=2,bty="n",col=bioCol[1:(ncol(rt)-2)])
 dev.off()
 
-#2.9.2 Combined application of GILPI-WGLPI in survival analysis
+#3.9.2 Combined application of GILPI-WGLPI in survival analysis
 ##GILPI-WGLPI联合生存分析
 #引用包
 library(survival)
